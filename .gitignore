@@ -1,0 +1,25 @@
+# --- Backend (.NET) ---
+**/bin/
+**/obj/
+*.user
+
+# Config dengan secret asli (connection string, JWT key) — jangan ikut ter-commit.
+# appsettings.json (base) TETAP disertakan, isinya sudah pakai nilai placeholder.
+**/appsettings.Development.json
+**/appsettings.Production.json
+
+# File yang diupload user (logo perusahaan) — jangan ikut di-commit, tapi folder tetap ada lewat .gitkeep
+backend/PaletFaktur.Api/wwwroot/uploads/*
+!backend/PaletFaktur.Api/wwwroot/uploads/.gitkeep
+
+# --- Frontend (Node / Next.js) ---
+**/node_modules/
+**/.next/
+**/.env.local
+*.tsbuildinfo
+
+# --- OS / Editor ---
+.DS_Store
+**/.DS_Store
+.vscode/
+.idea/
