@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api";
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
@@ -32,7 +32,7 @@ interface RequestOptions {
 async function handleResponse<T>(res: Response): Promise<T> {
   if (res.status === 401) {
     clearToken();
-    if (typeof window !== "undefined") window.location.href = "/login";
+    if (typeof window !== "undefined") window.location.href = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/login`;
     throw new Error("Sesi berakhir, silakan login kembali.");
   }
 

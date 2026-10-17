@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -84,7 +84,7 @@ using (var scope = app.Services.CreateScope())
         db.Users.Add(new User
         {
             Username = "admin",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(builder.Configuration["Bootstrap:AdminPassword"] ?? "Admin123!"),
             FullName = "Administrator",
             Role = "Admin"
         });

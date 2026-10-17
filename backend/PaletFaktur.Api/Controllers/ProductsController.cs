@@ -103,6 +103,19 @@ public class ProductsController : ControllerBase
         return Ok(ToResponse(product));
     }
 
+    [HttpPut("{id}/price")]
+    public async Task<ActionResult<ProductResponse>> UpdatePrice(int id, ProductUpdatePriceRequest request)
+    {
+        if (request.NewPrice < 0) return BadRequest(new { message = "Harga tidak boleh negatif." });
+
+        var product = await _db.Products.FindAsync(id);
+        if (product is null) return NotFound();
+
+        product.UnitPrice = request.NewPrice;
+        await _db.SaveChangesAsync();
+        return Ok(ToResponse(product));
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {

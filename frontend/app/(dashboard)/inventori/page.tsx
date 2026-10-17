@@ -58,6 +58,19 @@ export default function InventoriPage() {
     load();
   }
 
+  async function handleUpdatePrice(product: ProductResponse) {
+    const input = prompt(`Harga unit baru untuk ${product.name} (Rupiah):`, String(product.unitPrice));
+    if (input === null) return;
+    const newPrice = Number(input);
+    if (input.trim() === "" || Number.isNaN(newPrice) || newPrice < 0) return;
+    try {
+      await apiRequest(`/products/${product.id}/price`, { method: "PUT", body: { newPrice } });
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal mengubah harga.");
+    }
+  }
+
   async function handleDelete(product: ProductResponse) {
     if (!confirm(`Hapus produk ${product.name}?`)) return;
     await apiRequest(`/products/${product.id}`, { method: "DELETE" });
@@ -131,6 +144,7 @@ export default function InventoriPage() {
                   </td>
                   <td className="py-2">
                     <div className="flex gap-2">
+                      <button onClick={() => handleUpdatePrice(p)} className="text-xs rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">Ubah Harga</button>
                       <button onClick={() => handleUpdateStock(p)} className="text-xs rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">Ubah Stok</button>
                       <button onClick={() => handleDelete(p)} className="text-xs rounded-lg border border-red-200 text-red-600 px-2.5 py-1.5 hover:bg-red-50">Hapus</button>
                     </div>

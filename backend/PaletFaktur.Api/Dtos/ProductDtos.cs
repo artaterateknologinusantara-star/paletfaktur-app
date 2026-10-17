@@ -10,6 +10,8 @@ public record ProductCreateRequest(
 
 public record ProductUpdateStockRequest(int NewStock, string? Reason);
 
+public record ProductUpdatePriceRequest(decimal NewPrice);
+
 public record ProductResponse(
     int Id,
     string Sku,
