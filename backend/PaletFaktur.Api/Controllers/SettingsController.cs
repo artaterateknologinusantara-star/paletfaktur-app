@@ -48,6 +48,9 @@ public class SettingsController : ControllerBase
         settings.SignatoryName = request.SignatoryName;
         settings.SignatoryTitle = request.SignatoryTitle;
         settings.Address = request.Address;
+        settings.Tagline = request.Tagline;
+        settings.Website = request.Website;
+        settings.City = request.City;
         settings.BankName = request.BankName;
         settings.BankAccountNumber = request.BankAccountNumber;
         settings.BankAccountHolder = request.BankAccountHolder;
@@ -88,6 +91,6 @@ public class SettingsController : ControllerBase
     }
 
     private static CompanySettingsResponse ToResponse(CompanySettings s) => new(
-        s.LogoUrl, s.CompanyName, s.Phone, s.Email, s.SignatoryName, s.SignatoryTitle, s.Address,
+        s.LogoUrl, s.CompanyName, s.Phone, s.Email, s.SignatoryName, s.SignatoryTitle, s.Address, s.Tagline, s.Website, s.City,
         s.BankName, s.BankAccountNumber, s.BankAccountHolder, s.PpnRate, s.InvoiceDueDays);
 }

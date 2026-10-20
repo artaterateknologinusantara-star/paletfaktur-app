@@ -46,6 +46,7 @@ export interface InvoiceResponse {
   invoiceNumber: string;
   clientId: number;
   clientName: string;
+  clientAddress: string | null;
   issueDate: string;
   dueDate: string;
   poNumber: string | null;
@@ -106,6 +107,9 @@ export interface CompanySettingsResponse {
   signatoryName: string | null;
   signatoryTitle: string | null;
   address: string | null;
+  tagline: string | null;
+  website: string | null;
+  city: string | null;
   bankName: string | null;
   bankAccountNumber: string | null;
   bankAccountHolder: string | null;
@@ -135,4 +139,38 @@ export interface ReportSummaryResponse {
   overdueInvoiceCount: number;
   monthlyRevenue: { month: string; revenue: number }[];
   topProducts: { rank: number; sku: string; name: string; unitsSold: number; revenueValue: number }[];
+}
+
+export type QuotationStatus = "Draft" | "Terkirim" | "Disetujui" | "Ditolak";
+
+export interface QuotationItemResponse {
+  productId: number | null;
+  name: string;
+  condition: string | null;
+  color: string | null;
+  unitPrice: number;
+  quantity: number;
+  unit: string;
+  lineTotal: number;
+}
+
+export interface QuotationResponse {
+  id: number;
+  quotationNumber: string;
+  clientId: number | null;
+  recipientName: string;
+  quotationDate: string;
+  subject: string;
+  attachment: string | null;
+  introText: string | null;
+  notes: string | null;
+  status: QuotationStatus;
+  total: number;
+  items: QuotationItemResponse[];
+  photos: QuotationPhotoResponse[];
+}
+
+export interface QuotationPhotoResponse {
+  url: string;
+  caption: string | null;
 }

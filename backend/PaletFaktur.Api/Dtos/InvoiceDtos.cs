@@ -30,6 +30,7 @@ public record InvoiceResponse(
     string InvoiceNumber,
     int ClientId,
     string ClientName,
+    string? ClientAddress,
     DateTime IssueDate,
     DateTime DueDate,
     string? PoNumber,

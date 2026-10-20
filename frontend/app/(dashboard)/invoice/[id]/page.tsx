@@ -67,6 +67,7 @@ export default function InvoicePreviewPage() {
           <div>
             <p className="text-xs uppercase text-slate-400 font-medium mb-1">Ditagihkan Kepada</p>
             <p className="font-semibold">{invoice.clientName}</p>
+            {invoice.clientAddress && <p className="text-slate-500 max-w-xs whitespace-pre-line">{invoice.clientAddress}</p>}
           </div>
           <div className="text-right space-y-0.5">
             <p><span className="text-slate-400">Tgl. Penerbitan: </span>{formatDate(invoice.issueDate)}</p>

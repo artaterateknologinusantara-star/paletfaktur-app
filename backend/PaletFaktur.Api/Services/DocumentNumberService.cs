@@ -20,6 +20,23 @@ public class DocumentNumberService
         return $"INV-{datePart}-{sequence}";
     }
 
+    // Format: {urut}/SPH/MB/{tahun}; urut berlanjut dari nomor terbesar tahun tsb (aman bila ada yang dihapus).
+    public (string Number, int Sequence) NextQuotationNumber(int year)
+    {
+        var suffix = $"/SPH/MB/{year}";
+        var max = _db.Quotations
+            .Where(q => q.QuotationNumber.EndsWith(suffix))
+            .Max(q => (int?)q.Sequence) ?? 0;
+        var next = max + 1;
+        return ($"{next}{suffix}", next);
+    }
+
+    public static int ParseQuotationSequence(string number)
+    {
+        var head = number.Split('/')[0];
+        return int.TryParse(head, out var n) ? n : 0;
+    }
+
     public string NextSuratJalanNumber()
     {
         var count = _db.SuratJalans.Count();

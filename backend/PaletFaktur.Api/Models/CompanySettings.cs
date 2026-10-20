@@ -11,6 +11,9 @@ public class CompanySettings
     public string? SignatoryName { get; set; }
     public string? SignatoryTitle { get; set; }
     public string? Address { get; set; }
+    public string? Tagline { get; set; }       // mis. "Supplier dan Distributor Pallet Plastik" (kop surat penawaran)
+    public string? Website { get; set; }
+    public string? City { get; set; }          // kota penerbitan surat, mis. "Bekasi"
 
     public string? BankName { get; set; }
     public string? BankAccountNumber { get; set; }

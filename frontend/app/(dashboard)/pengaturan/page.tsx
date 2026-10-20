@@ -75,6 +75,9 @@ export default function PengaturanPage() {
         <Field label="Nama Perusahaan / PT *" value={form.companyName} onChange={(v) => update("companyName", v)} />
         <Field label="Nomor Telepon" value={form.phone ?? ""} onChange={(v) => update("phone", v)} />
         <Field label="Email Perusahaan" value={form.email ?? ""} onChange={(v) => update("email", v)} />
+        <Field label="Tagline Kop Surat" value={form.tagline ?? ""} onChange={(v) => update("tagline", v)} />
+        <Field label="Website" value={form.website ?? ""} onChange={(v) => update("website", v)} />
+        <Field label="Kota Penerbitan Surat" value={form.city ?? ""} onChange={(v) => update("city", v)} />
         <Field label="Nama Penanda Tangan" value={form.signatoryName ?? ""} onChange={(v) => update("signatoryName", v)} />
         <Field label="Jabatan Penanda Tangan" value={form.signatoryTitle ?? ""} onChange={(v) => update("signatoryTitle", v)} />
         <div>

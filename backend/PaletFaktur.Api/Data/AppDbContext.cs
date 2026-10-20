@@ -15,6 +15,9 @@ public class AppDbContext : DbContext
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<SuratJalan> SuratJalans => Set<SuratJalan>();
     public DbSet<SuratJalanItem> SuratJalanItems => Set<SuratJalanItem>();
+    public DbSet<Quotation> Quotations => Set<Quotation>();
+    public DbSet<QuotationItem> QuotationItems => Set<QuotationItem>();
+    public DbSet<QuotationPhoto> QuotationPhotos => Set<QuotationPhoto>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -46,6 +49,15 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<SuratJalanItem>()
             .Property(i => i.Quantity).HasColumnType("decimal(18,2)");
+
+        modelBuilder.Entity<Quotation>().HasIndex(q => q.QuotationNumber).IsUnique();
+        modelBuilder.Entity<Quotation>().Property(q => q.Total).HasColumnType("decimal(18,2)");
+        modelBuilder.Entity<QuotationItem>().Property(i => i.UnitPrice).HasColumnType("decimal(18,2)");
+        modelBuilder.Entity<QuotationItem>().Property(i => i.LineTotal).HasColumnType("decimal(18,2)");
+        modelBuilder.Entity<Quotation>()
+            .HasOne(q => q.Client).WithMany().HasForeignKey(q => q.ClientId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<QuotationItem>()
+            .HasOne(i => i.Quotation).WithMany(q => q.Items).HasForeignKey(i => i.QuotationId).OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<CompanySettings>()
             .Property(c => c.PpnRate).HasColumnType("decimal(5,4)");

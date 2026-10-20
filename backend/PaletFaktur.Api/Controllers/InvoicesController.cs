@@ -207,6 +207,7 @@ public class InvoicesController : ControllerBase
         invoice.InvoiceNumber,
         invoice.ClientId,
         invoice.Client?.Name ?? string.Empty,
+        invoice.Client?.Address,
         invoice.IssueDate,
         invoice.DueDate,
         invoice.PoNumber,

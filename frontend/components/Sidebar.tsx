@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: "▦" },
   { href: "/invoice", label: "Invoice", icon: "▤" },
   { href: "/invoice/create", label: "Buat Invoice", icon: "＋" },
+  { href: "/penawaran", label: "Penawaran", icon: "✉" },
   { href: "/surat-jalan", label: "Surat Jalan", icon: "▭" },
   { href: "/inventori", label: "Inventori", icon: "▣" },
   { href: "/klien", label: "Klien", icon: "◍" },
