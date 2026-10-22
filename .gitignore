@@ -23,3 +23,16 @@ backend/PaletFaktur.Api/wwwroot/uploads/*
 **/.DS_Store
 .vscode/
 .idea/
+
+# --- Mobile (Capacitor / Android) ---
+mobile/node_modules/
+mobile/out/
+mobile/android/app/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+# Hasil build Android apa pun, di folder mana pun
+*.apk
+*.aab
+# Keystore penandatanganan release — JANGAN pernah ikut ter-commit (password dipegang pemilik)
+*.jks
+*.keystore

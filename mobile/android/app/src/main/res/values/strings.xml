@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PaletFaktur</string>
+    <string name="title_activity_main">PaletFaktur</string>
+    <string name="package_name">com.menjemputberkah.paletfaktur</string>
+    <string name="custom_url_scheme">com.menjemputberkah.paletfaktur</string>
+</resources>
