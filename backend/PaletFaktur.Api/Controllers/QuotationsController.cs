@@ -61,13 +61,32 @@ public class QuotationsController : ControllerBase
         return Ok(new QuotationPhotoUploadResponse($"/uploads/{fileName}"));
     }
 
-    private static QuotationResponse ToResponse(Quotation q) => new(
+    private static QuotationResponse ToResponse(Quotation q, (int Id, string Number)? invoice = null) => new(
         q.Id, q.QuotationNumber, q.ClientId, q.RecipientName, q.QuotationDate, q.Subject, q.Attachment,
         q.IntroText, q.Notes, q.Status.ToString(), q.Total,
         q.Items.OrderBy(i => i.Id)
             .Select(i => new QuotationItemResponse(i.ProductId, i.Name, i.Condition, i.Color, i.UnitPrice, i.Quantity, i.Unit, i.LineTotal))
             .ToList(),
-        q.Photos.OrderBy(p => p.SortOrder).ThenBy(p => p.Id).Select(p => new QuotationPhotoDto(p.Url, p.Caption)).ToList());
+        q.Photos.OrderBy(p => p.SortOrder).ThenBy(p => p.Id).Select(p => new QuotationPhotoDto(p.Url, p.Caption)).ToList(),
+        invoice?.Id, invoice?.Number);
+
+    private async Task<Dictionary<int, (int Id, string Number)>> InvoiceMapAsync(IEnumerable<int> quotationIds)
+    {
+        var ids = quotationIds.ToList();
+        var rows = await _db.Invoices
+            .Where(i => i.QuotationId != null && ids.Contains(i.QuotationId.Value))
+            .Select(i => new { QuotationId = i.QuotationId!.Value, i.Id, i.InvoiceNumber })
+            .ToListAsync();
+        return rows.ToDictionary(r => r.QuotationId, r => (r.Id, r.InvoiceNumber));
+    }
+
+    private async Task<bool> HasInvoiceAsync(int quotationId) => await _db.Invoices.AnyAsync(i => i.QuotationId == quotationId);
+
+    private async Task<QuotationResponse> ResponseAsync(Quotation q)
+    {
+        var map = await InvoiceMapAsync(new[] { q.Id });
+        return ToResponse(q, map.TryGetValue(q.Id, out var inv) ? inv : null);
+    }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<QuotationResponse>>> GetAll([FromQuery] string? search)
@@ -78,14 +97,15 @@ public class QuotationsController : ControllerBase
             query = query.Where(q => q.QuotationNumber.Contains(search) || q.RecipientName.Contains(search));
         }
         var list = await query.OrderByDescending(q => q.QuotationDate).ThenByDescending(q => q.Id).ToListAsync();
-        return Ok(list.Select(ToResponse));
+        var map = await InvoiceMapAsync(list.Select(x => x.Id));
+        return Ok(list.Select(x => ToResponse(x, map.TryGetValue(x.Id, out var inv) ? inv : null)));
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<QuotationResponse>> GetById(int id)
     {
         var q = await _db.Quotations.Include(x => x.Items).Include(x => x.Photos).FirstOrDefaultAsync(x => x.Id == id);
-        return q is null ? NotFound() : Ok(ToResponse(q));
+        return q is null ? NotFound() : Ok(await ResponseAsync(q));
     }
 
     [HttpGet("next-number")]
@@ -130,6 +150,10 @@ public class QuotationsController : ControllerBase
 
         var q = await _db.Quotations.Include(x => x.Items).Include(x => x.Photos).FirstOrDefaultAsync(x => x.Id == id);
         if (q is null) return NotFound();
+        if (await HasInvoiceAsync(id))
+        {
+            return Conflict(new { message = "Penawaran sudah dibuatkan invoice dan tidak bisa diubah. Hapus invoice-nya terlebih dahulu." });
+        }
 
         if (!string.IsNullOrWhiteSpace(request.QuotationNumber) && request.QuotationNumber.Trim() != q.QuotationNumber)
         {
@@ -165,9 +189,13 @@ public class QuotationsController : ControllerBase
         }
         var q = await _db.Quotations.Include(x => x.Items).Include(x => x.Photos).FirstOrDefaultAsync(x => x.Id == id);
         if (q is null) return NotFound();
+        if (q.Status != status && await HasInvoiceAsync(id))
+        {
+            return Conflict(new { message = "Status tidak bisa diubah karena penawaran sudah dibuatkan invoice." });
+        }
         q.Status = status;
         await _db.SaveChangesAsync();
-        return Ok(ToResponse(q));
+        return Ok(await ResponseAsync(q));
     }
 
     [HttpDelete("{id}")]
@@ -175,6 +203,10 @@ public class QuotationsController : ControllerBase
     {
         var q = await _db.Quotations.Include(x => x.Items).Include(x => x.Photos).FirstOrDefaultAsync(x => x.Id == id);
         if (q is null) return NotFound();
+        if (await HasInvoiceAsync(id))
+        {
+            return Conflict(new { message = "Penawaran sudah dibuatkan invoice dan tidak bisa dihapus." });
+        }
         var photoUrls = q.Photos.Select(p => p.Url).ToList();
         _db.Quotations.Remove(q);
         await _db.SaveChangesAsync();

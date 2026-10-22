@@ -6,6 +6,7 @@ public class SuratJalanItem
     public int SuratJalanId { get; set; }
     public SuratJalan? SuratJalan { get; set; }
     public string ItemDescription { get; set; } = string.Empty;
+    public string? Color { get; set; }
     public decimal Quantity { get; set; }
     public string Unit { get; set; } = "pcs";
     public string? Notes { get; set; }

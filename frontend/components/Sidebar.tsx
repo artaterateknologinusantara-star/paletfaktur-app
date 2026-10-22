@@ -7,7 +7,7 @@ import { clearToken } from "@/lib/api";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: "▦" },
   { href: "/invoice", label: "Invoice", icon: "▤" },
-  { href: "/invoice/create", label: "Buat Invoice", icon: "＋" },
+  { href: "/invoice/create", label: "Invoice dari Penawaran", icon: "＋" },
   { href: "/penawaran", label: "Penawaran", icon: "✉" },
   { href: "/surat-jalan", label: "Surat Jalan", icon: "▭" },
   { href: "/inventori", label: "Inventori", icon: "▣" },

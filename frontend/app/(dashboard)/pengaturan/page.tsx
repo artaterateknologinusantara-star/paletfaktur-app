@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiRequest, assetUrl, uploadFile } from "@/lib/api";
 import { CompanySettingsResponse, LogoUploadResponse } from "@/lib/types";
+import SignaturePad from "@/components/SignaturePad";
 
 export default function PengaturanPage() {
   const [form, setForm] = useState<CompanySettingsResponse | null>(null);
@@ -31,6 +32,20 @@ export default function PengaturanPage() {
       update("logoUrl", result.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal mengunggah logo.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleImageUpload(path: string, key: "signatureUrl" | "stampUrl", file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    setUploading(true);
+    try {
+      const result = await uploadFile<LogoUploadResponse>(path, file);
+      update(key, result.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal mengunggah gambar.");
     } finally {
       setUploading(false);
     }
@@ -83,6 +98,64 @@ export default function PengaturanPage() {
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Alamat Perusahaan</label>
           <textarea className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" rows={3} value={form.address ?? ""} onChange={(e) => update("address", e.target.value)} />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 p-6 col-span-2">
+        <h2 className="text-xs font-medium tracking-wide text-slate-400 uppercase mb-1">Tanda Tangan Digital &amp; Stempel</h2>
+        <p className="text-xs text-slate-400 mb-4">
+          Dicetak otomatis di Penawaran, Invoice, dan Surat Jalan atas nama penanda tangan. Ini tanda tangan bergambar (visual), bukan
+          tanda tangan elektronik tersertifikasi. Klik &quot;Simpan Perubahan&quot; setelah memilih.
+        </p>
+        <div className="grid grid-cols-2 gap-6">
+          <div>
+            <p className="text-xs font-medium text-slate-600 mb-2">Tanda Tangan {form.signatoryName ? "(" + form.signatoryName + ")" : ""}</p>
+            {form.signatureUrl && (
+              <div className="mb-3 flex items-center gap-3">
+                <div className="h-20 rounded-lg border border-slate-200 bg-white p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={assetUrl(form.signatureUrl)} alt="Tanda tangan" className="h-full w-auto object-contain" />
+                </div>
+                <button type="button" onClick={() => update("signatureUrl", null)} className="text-xs text-red-600 hover:underline">Hapus</button>
+              </div>
+            )}
+            <SignaturePad disabled={uploading} onSave={(file) => handleImageUpload("/settings/signature", "signatureUrl", file)} />
+            <label className="block mt-3">
+              <span className="text-xs text-slate-500">Atau unggah gambar tanda tangan (PNG transparan disarankan)</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                disabled={uploading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  handleImageUpload("/settings/signature", "signatureUrl", f);
+                }}
+                className="mt-1 w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-medium file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-60"
+              />
+            </label>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-slate-600 mb-2">Stempel Perusahaan</p>
+            <div className="w-28 h-28 rounded-lg border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-300 text-xs mb-3 overflow-hidden bg-white">
+              {form.stampUrl ? <img src={assetUrl(form.stampUrl)} alt="Stempel" className="w-full h-full object-contain" /> : "Stempel"}
+            </div>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={uploading}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                handleImageUpload("/settings/stamp", "stampUrl", f);
+              }}
+              className="w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-medium file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-60"
+            />
+            {form.stampUrl && (
+              <button type="button" onClick={() => update("stampUrl", null)} className="mt-2 text-xs text-red-600 hover:underline">Hapus stempel</button>
+            )}
+            <p className="text-xs text-slate-400 mt-2">Foto/scan stempel, sebaiknya PNG dengan latar transparan.</p>
+          </div>
         </div>
       </div>
 

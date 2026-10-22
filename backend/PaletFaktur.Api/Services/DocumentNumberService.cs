@@ -2,7 +2,7 @@ using PaletFaktur.Api.Data;
 
 namespace PaletFaktur.Api.Services;
 
-// Menghasilkan nomor dokumen berformat INV-YYYYMMDD-000N dan SJ-00N
+// Menghasilkan nomor dokumen: {urut}/INV/MBSTA/{tahun}, {urut}/SJ/MBSTA/{tahun}, {urut}/SPH/MB/{tahun}
 public class DocumentNumberService
 {
     private readonly AppDbContext _db;
@@ -12,12 +12,15 @@ public class DocumentNumberService
         _db = db;
     }
 
-    public string NextInvoiceNumber(DateTime issueDate)
+    // Format: {urut 3 digit}/INV/MBSTA/{tahun}; urut berlanjut dari nomor terbesar tahun tsb.
+    public (string Number, int Sequence) NextInvoiceNumber(DateTime issueDate)
     {
-        var datePart = issueDate.ToString("yyyyMMdd");
-        var countToday = _db.Invoices.Count(i => i.InvoiceNumber.Contains(datePart));
-        var sequence = (countToday + 1).ToString("D4");
-        return $"INV-{datePart}-{sequence}";
+        var suffix = $"/INV/MBSTA/{issueDate.Year}";
+        var max = _db.Invoices
+            .Where(i => i.InvoiceNumber.EndsWith(suffix))
+            .Max(i => (int?)i.Sequence) ?? 0;
+        var next = max + 1;
+        return ($"{next:D3}{suffix}", next);
     }
 
     // Format: {urut}/SPH/MB/{tahun}; urut berlanjut dari nomor terbesar tahun tsb (aman bila ada yang dihapus).
@@ -37,10 +40,20 @@ public class DocumentNumberService
         return int.TryParse(head, out var n) ? n : 0;
     }
 
-    public string NextSuratJalanNumber()
+    // Format: {urut 3 digit}/SJ/MBSTA/{tahun}, urut berlanjut dari nomor terbesar tahun tsb.
+    public (string Number, int Sequence) NextSuratJalanNumber(int year)
     {
-        var count = _db.SuratJalans.Count();
-        var sequence = (count + 1).ToString("D3");
-        return $"SJ-{sequence}";
+        var suffix = $"/SJ/MBSTA/{year}";
+        var max = _db.SuratJalans
+            .Where(s => s.SuratJalanNumber.EndsWith(suffix))
+            .Max(s => (int?)s.Sequence) ?? 0;
+        var next = max + 1;
+        return ($"{next:D3}{suffix}", next);
+    }
+
+    public static int ParseSequence(string number)
+    {
+        var head = number.Split('/')[0];
+        return int.TryParse(head, out var n) ? n : 0;
     }
 }

@@ -3,15 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { apiRequest, formatRupiah } from "@/lib/api";
-import { ClientResponse, CompanySettingsResponse, ProductResponse } from "@/lib/types";
-
-interface LineItem {
-  productId: number;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-}
+import { apiRequest, formatDate, formatRupiah } from "@/lib/api";
+import { ClientResponse, CompanySettingsResponse, ProductResponse, QuotationResponse } from "@/lib/types";
 
 function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
@@ -26,9 +19,11 @@ function addDaysToDateString(dateStr: string, days: number): string {
 
 export default function CreateInvoicePage() {
   const router = useRouter();
+  const [quotations, setQuotations] = useState<QuotationResponse[]>([]);
   const [clients, setClients] = useState<ClientResponse[]>([]);
   const [products, setProducts] = useState<ProductResponse[]>([]);
-  const [clientId, setClientId] = useState<number | "">("");
+  const [quotationId, setQuotationId] = useState<number | "">("");
+  const [loaded, setLoaded] = useState(false);
 
   const [applyTax, setApplyTax] = useState(true);
   const [issueDate, setIssueDate] = useState(todayDateString());
@@ -39,19 +34,30 @@ export default function CreateInvoicePage() {
   const [ppnRatePercent, setPpnRatePercent] = useState(12);
   const [notes, setNotes] = useState("");
 
-  const [items, setItems] = useState<LineItem[]>([{ productId: 0, description: "", quantity: 1, unitPrice: 0 }]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    apiRequest<ClientResponse[]>("/clients").then(setClients).catch((e) => setError(e.message));
-    apiRequest<ProductResponse[]>("/products").then(setProducts).catch((e) => setError(e.message));
-    apiRequest<CompanySettingsResponse>("/settings")
-      .then((s) => {
+    Promise.all([
+      apiRequest<QuotationResponse[]>("/quotations"),
+      apiRequest<ClientResponse[]>("/clients"),
+      apiRequest<ProductResponse[]>("/products"),
+      apiRequest<CompanySettingsResponse>("/settings"),
+    ])
+      .then(([q, c, p, s]) => {
+        const ready = q.filter((x) => x.status === "Disetujui" && x.invoiceId === null);
+        setQuotations(ready);
+        setClients(c);
+        setProducts(p);
         setInvoiceDueDays(s.invoiceDueDays);
         setPpnRatePercent(s.ppnRate * 100);
+
+        // Datang dari tombol "Buat Invoice" di daftar penawaran: ?quotationId=..
+        const preselect = Number(new URLSearchParams(window.location.search).get("quotationId"));
+        if (preselect && ready.some((x) => x.id === preselect)) setQuotationId(preselect);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e.message))
+      .finally(() => setLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -60,53 +66,30 @@ export default function CreateInvoicePage() {
     }
   }, [issueDate, invoiceDueDays, dueDateTouched]);
 
-  const selectedClient = clients.find((c) => c.id === clientId);
+  const quotation = quotations.find((q) => q.id === quotationId);
+  const client = quotation ? clients.find((c) => c.id === quotation.clientId) : undefined;
 
-  function updateItem(index: number, patch: Partial<LineItem>) {
-    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
-  }
-
-  function handleProductChange(index: number, productId: number) {
-    const product = products.find((p) => p.id === productId);
-    updateItem(index, { productId, unitPrice: product?.unitPrice ?? 0 });
-  }
-
-  function addRow() {
-    setItems((prev) => [...prev, { productId: 0, description: "", quantity: 1, unitPrice: 0 }]);
-  }
-
-  function removeRow(index: number) {
-    setItems((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0), [items]);
-
-  const stockErrors = useMemo(() => {
-    const totalByProduct = new Map<number, number>();
-    for (const item of items) {
-      if (item.productId > 0) {
-        totalByProduct.set(item.productId, (totalByProduct.get(item.productId) ?? 0) + item.quantity);
-      }
+  // Baris penawaran + status keterhubungan katalog dan stok. Barang tidak bisa diubah di sini.
+  const rows = useMemo(() => {
+    if (!quotation) return [];
+    const needed = new Map<number, number>();
+    for (const item of quotation.items) {
+      if (item.productId) needed.set(item.productId, (needed.get(item.productId) ?? 0) + item.quantity);
     }
-
-    const errors: Record<number, string> = {};
-    items.forEach((item, index) => {
-      if (item.productId <= 0) return;
-      const product = products.find((p) => p.id === item.productId);
-      if (!product) return;
-      const totalQty = totalByProduct.get(item.productId) ?? 0;
-      if (totalQty > product.stock) {
-        errors[index] =
-          totalQty !== item.quantity
-            ? `Total qty "${product.name}" di semua baris (${totalQty}) melebihi stok tersedia (${product.stock}).`
-            : `Qty melebihi stok tersedia (${product.stock}).`;
+    return quotation.items.map((item) => {
+      const product = item.productId ? products.find((p) => p.id === item.productId) : undefined;
+      let problem: string | null = null;
+      if (!item.productId) problem = "Belum terhubung ke katalog inventori. Edit penawaran dan pilih barang dari inventori.";
+      else if (!product) problem = "Barang sudah tidak ada di katalog.";
+      else if ((needed.get(product.id) ?? 0) > product.stock) {
+        problem = `Stok tidak cukup (butuh ${needed.get(product.id)}, tersedia ${product.stock}).`;
       }
+      return { item, product, problem };
     });
-    return errors;
-  }, [items, products]);
+  }, [quotation, products]);
 
-  const hasStockErrors = Object.keys(stockErrors).length > 0;
-
+  const hasProblems = rows.some((r) => r.problem);
+  const subtotal = quotation ? quotation.total : 0;
   const dppNilaiLain = useMemo(() => Math.round((subtotal * 11) / 12), [subtotal]);
   const ppnAmount = useMemo(
     () => (applyTax ? Math.round(dppNilaiLain * (ppnRatePercent / 100)) : 0),
@@ -116,17 +99,12 @@ export default function CreateInvoicePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!clientId) {
-      setError("Pilih klien terlebih dahulu.");
+    if (!quotation) {
+      setError("Pilih penawaran yang sudah disetujui terlebih dahulu.");
       return;
     }
-    const validItems = items.filter((i) => i.productId > 0 && i.quantity > 0);
-    if (validItems.length === 0) {
-      setError("Tambahkan minimal satu barang.");
-      return;
-    }
-    if (hasStockErrors) {
-      setError("Perbaiki qty yang melebihi stok tersedia sebelum menyimpan.");
+    if (hasProblems) {
+      setError("Perbaiki barang bermasalah (katalog / stok) sebelum menyimpan.");
       return;
     }
 
@@ -136,19 +114,13 @@ export default function CreateInvoicePage() {
       await apiRequest("/invoices", {
         method: "POST",
         body: {
-          clientId,
+          quotationId: quotation.id,
           issueDate,
           dueDate,
           poNumber: poNumber || null,
           applyTax,
           ppnRateOverride: applyTax ? ppnRatePercent / 100 : null,
           notes: notes || null,
-          items: validItems.map((i) => ({
-            productId: i.productId,
-            quantity: i.quantity,
-            descriptionOverride: i.description || null,
-            unitPriceOverride: i.unitPrice,
-          })),
         },
       });
       router.push("/invoice");
@@ -170,8 +142,8 @@ export default function CreateInvoicePage() {
             ←
           </Link>
           <div>
-            <h1 className="text-2xl font-bold">Buat Invoice</h1>
-            <p className="text-sm text-slate-500">Buat penjualan baru, kelola produk, dan tentukan jadwal pengiriman.</p>
+            <h1 className="text-2xl font-bold">Buat Invoice dari Penawaran</h1>
+            <p className="text-sm text-slate-500">Barang, jumlah, dan harga diambil dari penawaran yang sudah disetujui.</p>
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
@@ -180,7 +152,7 @@ export default function CreateInvoicePage() {
           </Link>
           <button
             type="submit"
-            disabled={submitting || hasStockErrors}
+            disabled={submitting || !quotation || hasProblems}
             className="rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-60"
           >
             {submitting ? "Menyimpan..." : "💾 Daftarkan Invoice & Potong Stok"}
@@ -190,6 +162,16 @@ export default function CreateInvoicePage() {
 
       {error && (
         <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+      )}
+
+      {loaded && quotations.length === 0 && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Belum ada penawaran yang siap diinvoice. Invoice hanya bisa dibuat dari penawaran berstatus <b>Disetujui</b> yang belum
+          punya invoice.{" "}
+          <Link href="/penawaran" className="font-medium underline">
+            Buka daftar penawaran
+          </Link>
+        </div>
       )}
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6 flex flex-wrap items-center gap-3">
@@ -222,30 +204,36 @@ export default function CreateInvoicePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 p-5">
-            <h2 className="text-xs font-medium tracking-wide text-slate-400 uppercase mb-3">Informasi Klien</h2>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Pilih Klien / Customer</label>
+            <h2 className="text-xs font-medium tracking-wide text-slate-400 uppercase mb-3">Penawaran Disetujui</h2>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Pilih Penawaran</label>
             <select
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              value={clientId}
-              onChange={(e) => setClientId(Number(e.target.value))}
+              value={quotationId}
+              onChange={(e) => setQuotationId(e.target.value ? Number(e.target.value) : "")}
               required
             >
-              <option value="">Pilih atau cari klien...</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+              <option value="">Pilih penawaran...</option>
+              {quotations.map((q) => (
+                <option key={q.id} value={q.id}>
+                  {q.quotationNumber} — {q.recipientName}
+                </option>
               ))}
             </select>
 
             <div className="mt-3 rounded-lg border border-dashed border-slate-200 p-3 min-h-[76px] flex items-center justify-center">
-              {selectedClient ? (
+              {quotation ? (
                 <div className="w-full text-xs text-slate-600 space-y-0.5">
-                  <p className="font-semibold text-slate-800 text-sm">{selectedClient.name}</p>
-                  {selectedClient.address && <p>{selectedClient.address}</p>}
-                  {selectedClient.email && <p>{selectedClient.email}</p>}
-                  {selectedClient.phone && <p>{selectedClient.phone}</p>}
+                  <p className="font-semibold text-slate-800 text-sm">{quotation.recipientName}</p>
+                  {client?.address && <p>{client.address}</p>}
+                  {client?.email && <p>{client.email}</p>}
+                  {client?.phone && <p>{client.phone}</p>}
+                  <p className="text-slate-400 pt-1">Tgl. penawaran: {formatDate(quotation.quotationDate)}</p>
+                  {!client && (
+                    <p className="text-amber-600 pt-1">Penerima belum terdaftar sebagai klien; klien baru dibuat otomatis saat invoice disimpan.</p>
+                  )}
                 </div>
               ) : (
-                <p className="text-xs text-slate-400">Klien belum terpilih.</p>
+                <p className="text-xs text-slate-400">Penawaran belum dipilih.</p>
               )}
             </div>
           </div>
@@ -291,14 +279,12 @@ export default function CreateInvoicePage() {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-medium tracking-wide text-slate-400 uppercase">Produk / Layanan</h2>
-              <button
-                type="button"
-                onClick={addRow}
-                className="text-xs rounded-lg bg-blue-50 text-blue-700 px-3 py-1.5 font-medium hover:bg-blue-100"
-              >
-                + Tambah Produk
-              </button>
+              <h2 className="text-xs font-medium tracking-wide text-slate-400 uppercase">Produk / Layanan (dari penawaran)</h2>
+              {quotation && (
+                <Link href={`/penawaran/${quotation.id}`} className="text-xs text-blue-600 hover:underline">
+                  Lihat penawaran {quotation.quotationNumber}
+                </Link>
+              )}
             </div>
 
             <table className="w-full text-sm">
@@ -306,78 +292,42 @@ export default function CreateInvoicePage() {
                 <tr className="text-left text-[11px] text-slate-400 uppercase border-b border-slate-100">
                   <th className="py-2 pr-2 font-medium w-8">#</th>
                   <th className="py-2 px-2 font-medium">Produk / Layanan</th>
-                  <th className="py-2 px-2 font-medium">Deskripsi</th>
-                  <th className="py-2 px-2 font-medium w-16">Qty</th>
-                  <th className="py-2 px-2 font-medium w-32">Harga Satuan</th>
-                  <th className="py-2 px-2 font-medium w-28 text-right">Total</th>
-                  <th className="py-2 pl-2 w-8"></th>
+                  <th className="py-2 px-2 font-medium w-16 text-right">Qty</th>
+                  <th className="py-2 px-2 font-medium w-32 text-right">Harga Satuan</th>
+                  <th className="py-2 pl-2 font-medium w-32 text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((item, index) => {
-                  const rowError = stockErrors[index];
-                  return (
-                    <tr key={index} className="border-b border-slate-50 last:border-0 align-top">
-                      <td className="py-2 pr-2 text-slate-400">{index + 1}</td>
-                      <td className="py-2 px-2">
-                        <select
-                          className={`w-full rounded-lg border px-2 py-1.5 text-sm ${rowError ? "border-red-300" : "border-slate-300"}`}
-                          value={item.productId}
-                          onChange={(e) => handleProductChange(index, Number(e.target.value))}
-                        >
-                          <option value={0}>Pilih produk...</option>
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>{p.sku} — {p.name} (stok {p.stock})</option>
-                          ))}
-                        </select>
-                        {rowError && <p className="text-[11px] text-red-600 mt-1">{rowError}</p>}
-                      </td>
-                      <td className="py-2 px-2">
-                        <input
-                          type="text"
-                          placeholder="Nama produk/jasa..."
-                          className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                          value={item.description}
-                          onChange={(e) => updateItem(index, { description: e.target.value })}
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <input
-                          type="number"
-                          min={1}
-                          className={`w-16 rounded-lg border px-2 py-1.5 text-sm ${rowError ? "border-red-300" : "border-slate-300"}`}
-                          value={item.quantity}
-                          onChange={(e) => updateItem(index, { quantity: Number(e.target.value) })}
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <input
-                          type="number"
-                          min={0}
-                          className="w-28 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                          value={item.unitPrice}
-                          onChange={(e) => updateItem(index, { unitPrice: Number(e.target.value) })}
-                        />
-                      </td>
-                      <td className="py-2 px-2 text-right font-medium">{formatRupiah(item.quantity * item.unitPrice)}</td>
-                      <td className="py-2 pl-2">
-                        <button
-                          type="button"
-                          onClick={() => removeRow(index)}
-                          className="text-red-500 hover:text-red-600"
-                          title="Hapus baris"
-                        >
-                          🗑
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {rows.map(({ item, product, problem }, index) => (
+                  <tr key={index} className="border-b border-slate-50 last:border-0 align-top">
+                    <td className="py-2 pr-2 text-slate-400">{index + 1}</td>
+                    <td className="py-2 px-2">
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-xs text-slate-400">
+                        {[item.condition, item.color].filter(Boolean).join(" · ")}
+                        {product ? `${item.condition || item.color ? " · " : ""}${product.sku} (stok ${product.stock})` : ""}
+                      </p>
+                      {problem && <p className="text-[11px] text-red-600 mt-1">{problem}</p>}
+                    </td>
+                    <td className="py-2 px-2 text-right">
+                      {item.quantity} {item.unit}
+                    </td>
+                    <td className="py-2 px-2 text-right">{formatRupiah(item.unitPrice)}</td>
+                    <td className="py-2 pl-2 text-right font-medium">{formatRupiah(item.lineTotal)}</td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-sm text-slate-400">
+                      Pilih penawaran untuk menampilkan barangnya.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
 
             <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100">
-              <span className="text-xs text-slate-400">{items.length} item</span>
+              <span className="text-xs text-slate-400">{rows.length} item</span>
               <div className="text-sm">
                 <span className="text-slate-400 mr-2">Subtotal (tanpa pajak)</span>
                 <span className="font-semibold">{formatRupiah(subtotal)}</span>

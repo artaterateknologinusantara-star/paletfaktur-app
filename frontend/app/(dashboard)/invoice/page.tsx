@@ -49,7 +49,7 @@ export default function InvoiceListPage() {
           <p className="text-sm text-slate-500">Kelola penjualan, cetak faktur, pantau pelunasan, dan batalkan tagihan.</p>
         </div>
         <Link href="/invoice/create" className="rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700">
-          + Buat Invoice Baru
+          + Buat Invoice dari Penawaran
         </Link>
       </div>
 

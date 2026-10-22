@@ -15,7 +15,9 @@ public record CompanySettingsResponse(
     string? BankAccountNumber,
     string? BankAccountHolder,
     decimal PpnRate,
-    int InvoiceDueDays);
+    int InvoiceDueDays,
+    string? SignatureUrl = null,
+    string? StampUrl = null);
 
 public record CompanySettingsUpdateRequest(
     string? LogoUrl,
@@ -32,6 +34,8 @@ public record CompanySettingsUpdateRequest(
     string? BankAccountNumber,
     string? BankAccountHolder,
     decimal PpnRate,
-    int InvoiceDueDays);
+    int InvoiceDueDays,
+    string? SignatureUrl = null,
+    string? StampUrl = null);
 
 public record LogoUploadResponse(string Url);

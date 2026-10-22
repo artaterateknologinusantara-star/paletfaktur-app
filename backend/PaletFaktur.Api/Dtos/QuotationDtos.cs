@@ -46,7 +46,9 @@ public record QuotationResponse(
     string Status,
     decimal Total,
     List<QuotationItemResponse> Items,
-    List<QuotationPhotoDto> Photos);
+    List<QuotationPhotoDto> Photos,
+    int? InvoiceId,
+    string? InvoiceNumber);
 
 public record QuotationPhotoDto(string Url, string? Caption);
 

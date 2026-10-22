@@ -23,14 +23,10 @@ public class InvoicePpnCalculationTests
         db.Products.Add(product);
         db.CompanySettings.Add(new CompanySettings { PpnRate = ppnRate, InvoiceDueDays = 30 });
         await db.SaveChangesAsync();
+        var quotation = await QuotationFactory.CreateAsync(db, client, new[] { ((Product?)product, quantity, unitPrice) });
 
         var controller = new InvoicesController(db, new DocumentNumberService(db));
-        var request = new InvoiceCreateRequest(client.Id, DateTime.UtcNow.Date, new List<InvoiceItemRequest>
-        {
-            new(product.Id, quantity)
-        });
-
-        var actionResult = await controller.Create(request);
+        var actionResult = await controller.Create(new InvoiceCreateRequest(quotation.Id, DateTime.UtcNow.Date, null, null, true, null, null));
         var createdResult = Assert.IsType<CreatedAtActionResult>(actionResult.Result);
         var created = Assert.IsType<InvoiceResponse>(createdResult.Value);
 

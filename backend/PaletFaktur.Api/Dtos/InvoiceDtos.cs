@@ -1,26 +1,22 @@
 namespace PaletFaktur.Api.Dtos;
 
-public record InvoiceItemRequest(
-    int ProductId,
-    int Quantity,
-    string? DescriptionOverride,
-    decimal? UnitPriceOverride);
-
+// Invoice dibuat dari penawaran berstatus Disetujui: barang, qty, dan harga diambil dari penawaran.
 public record InvoiceCreateRequest(
-    int ClientId,
+    int QuotationId,
     DateTime? IssueDate,
     DateTime? DueDate,
     string? PoNumber,
     bool ApplyTax,
     decimal? PpnRateOverride,
-    string? Notes,
-    List<InvoiceItemRequest> Items);
+    string? Notes);
 
 public record InvoiceItemResponse(
     int ProductId,
     string ProductName,
     string ProductSku,
     string? Description,
+    string? Condition,
+    string? Color,
     int Quantity,
     decimal UnitPrice,
     decimal LineTotal);

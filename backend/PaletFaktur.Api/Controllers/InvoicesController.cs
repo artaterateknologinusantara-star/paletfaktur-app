@@ -67,22 +67,40 @@ public class InvoicesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<InvoiceResponse>> Create(InvoiceCreateRequest request)
     {
-        if (request.Items is null || request.Items.Count == 0)
+        var quotation = await _db.Quotations.Include(q => q.Items).FirstOrDefaultAsync(q => q.Id == request.QuotationId);
+        if (quotation is null) return BadRequest(new { message = "Penawaran tidak ditemukan." });
+        if (quotation.Status != QuotationStatus.Disetujui)
         {
-            return BadRequest(new { message = "Invoice harus memiliki minimal satu barang." });
+            return BadRequest(new { message = "Invoice hanya bisa dibuat dari penawaran berstatus Disetujui." });
+        }
+        if (await _db.Invoices.AnyAsync(i => i.QuotationId == quotation.Id))
+        {
+            return Conflict(new { message = "Penawaran ini sudah dibuatkan invoice." });
+        }
+        if (quotation.Items.Count == 0)
+        {
+            return BadRequest(new { message = "Penawaran tidak memiliki barang." });
+        }
+        var unlinked = quotation.Items.Where(i => i.ProductId is null).Select(i => i.Name).ToList();
+        if (unlinked.Count > 0)
+        {
+            return BadRequest(new { message = $"Barang berikut belum terhubung ke katalog inventori: {string.Join(", ", unlinked)}. Edit penawaran dan pilih barang dari inventori." });
         }
 
-        var client = await _db.Clients.FindAsync(request.ClientId);
-        if (client is null) return BadRequest(new { message = "Klien tidak ditemukan." });
+        var client = await ResolveClientAsync(quotation);
 
         var settings = await _db.CompanySettings.FirstOrDefaultAsync() ?? new CompanySettings();
         var issueDate = request.IssueDate ?? DateTime.UtcNow.Date;
         var dueDate = request.DueDate ?? issueDate.AddDays(settings.InvoiceDueDays);
 
+        var (invoiceNumber, invoiceSequence) = _docNumbers.NextInvoiceNumber(issueDate);
         var invoice = new Invoice
         {
-            InvoiceNumber = _docNumbers.NextInvoiceNumber(issueDate),
+            InvoiceNumber = invoiceNumber,
+            Sequence = invoiceSequence,
             ClientId = client.Id,
+            Client = client,
+            QuotationId = quotation.Id,
             IssueDate = issueDate,
             DueDate = dueDate,
             PoNumber = request.PoNumber,
@@ -93,38 +111,41 @@ public class InvoicesController : ControllerBase
 
         decimal subtotal = 0;
 
-        foreach (var itemRequest in request.Items)
+        // Satu produk bisa muncul di beberapa baris penawaran: cek stok terhadap total qty per produk.
+        var needed = quotation.Items.GroupBy(i => i.ProductId!.Value).ToDictionary(g => g.Key, g => g.Sum(i => i.Quantity));
+
+        foreach (var item in quotation.Items)
         {
-            var product = await _db.Products.FindAsync(itemRequest.ProductId);
+            var product = await _db.Products.FindAsync(item.ProductId!.Value);
             if (product is null)
             {
-                return BadRequest(new { message = $"Produk id {itemRequest.ProductId} tidak ditemukan." });
+                return BadRequest(new { message = $"Produk untuk \"{item.Name}\" sudah tidak ada di katalog." });
             }
-            if (product.Stock < itemRequest.Quantity)
+            if (product.Stock < needed[product.Id])
             {
-                return BadRequest(new { message = $"Stok {product.Name} tidak mencukupi. Sisa stok: {product.Stock}." });
+                return BadRequest(new { message = $"Stok {product.Name} tidak mencukupi. Dibutuhkan: {needed[product.Id]}, sisa stok: {product.Stock}." });
             }
 
-            var unitPrice = itemRequest.UnitPriceOverride ?? product.UnitPrice;
-            var lineTotal = unitPrice * itemRequest.Quantity;
-            subtotal += lineTotal;
+            subtotal += item.LineTotal;
 
             invoice.Items.Add(new InvoiceItem
             {
                 ProductId = product.Id,
                 ProductNameSnapshot = product.Name,
                 ProductSkuSnapshot = product.Sku,
-                Description = itemRequest.DescriptionOverride,
-                Quantity = itemRequest.Quantity,
-                UnitPrice = unitPrice,
-                LineTotal = lineTotal
+                Description = item.Name,
+                Condition = item.Condition,
+                Color = item.Color,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                LineTotal = item.LineTotal
             });
 
-            product.Stock -= itemRequest.Quantity;
+            product.Stock -= item.Quantity;
             _db.StockMutations.Add(new StockMutation
             {
                 ProductId = product.Id,
-                QuantityChange = -itemRequest.Quantity,
+                QuantityChange = -item.Quantity,
                 Type = StockMutationType.InvoiceDeduction,
                 SourceReference = invoice.InvoiceNumber
             });
@@ -159,6 +180,28 @@ public class InvoicesController : ControllerBase
             .FirstAsync(i => i.Id == invoice.Id);
 
         return CreatedAtAction(nameof(GetById), new { id = invoice.Id }, ToResponse(created));
+    }
+
+    // Klien dari penawaran; bila penerima belum terdaftar, cocokkan berdasarkan nama atau buat klien baru.
+    private async Task<Client> ResolveClientAsync(Quotation quotation)
+    {
+        if (quotation.ClientId is int id)
+        {
+            var existing = await _db.Clients.FindAsync(id);
+            if (existing is not null) return existing;
+        }
+
+        var name = quotation.RecipientName.Trim();
+        var byName = await _db.Clients.FirstOrDefaultAsync(c => c.Name == name);
+        if (byName is not null) return byName;
+
+        var client = new Client
+        {
+            ClientCode = $"CLT-{await _db.Clients.CountAsync() + 1}",
+            Name = name
+        };
+        _db.Clients.Add(client);
+        return client;
     }
 
     [HttpPut("{id}/mark-paid")]
@@ -220,5 +263,5 @@ public class InvoicesController : ControllerBase
         invoice.DppNilaiLain != 0 ? Math.Round(invoice.PpnAmount / invoice.DppNilaiLain, 4) : 0,
         invoice.Total,
         invoice.Items.Select(i => new InvoiceItemResponse(
-            i.ProductId, i.ProductNameSnapshot, i.ProductSkuSnapshot, i.Description, i.Quantity, i.UnitPrice, i.LineTotal)).ToList());
+            i.ProductId, i.ProductNameSnapshot, i.ProductSkuSnapshot, i.Description, i.Condition, i.Color, i.Quantity, i.UnitPrice, i.LineTotal)).ToList());
 }

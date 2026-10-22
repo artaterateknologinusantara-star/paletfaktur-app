@@ -109,6 +109,12 @@ namespace PaletFaktur.Api.Migrations
                     b.Property<string>("SignatoryTitle")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("SignatureUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("StampUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Tagline")
                         .HasColumnType("nvarchar(max)");
 
@@ -179,6 +185,12 @@ namespace PaletFaktur.Api.Migrations
                     b.Property<decimal>("PpnAmount")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int?>("QuotationId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -195,6 +207,10 @@ namespace PaletFaktur.Api.Migrations
                     b.HasIndex("InvoiceNumber")
                         .IsUnique();
 
+                    b.HasIndex("QuotationId")
+                        .IsUnique()
+                        .HasFilter("[QuotationId] IS NOT NULL");
+
                     b.ToTable("Invoices");
                 });
 
@@ -205,6 +221,12 @@ namespace PaletFaktur.Api.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Color")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Condition")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
@@ -471,9 +493,18 @@ namespace PaletFaktur.Api.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PoNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RecipientDescription")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("RecipientName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -505,6 +536,9 @@ namespace PaletFaktur.Api.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Color")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ItemDescription")
                         .IsRequired()
@@ -573,7 +607,14 @@ namespace PaletFaktur.Api.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("PaletFaktur.Api.Models.Quotation", "Quotation")
+                        .WithMany()
+                        .HasForeignKey("QuotationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Client");
+
+                    b.Navigation("Quotation");
                 });
 
             modelBuilder.Entity("PaletFaktur.Api.Models.InvoiceItem", b =>

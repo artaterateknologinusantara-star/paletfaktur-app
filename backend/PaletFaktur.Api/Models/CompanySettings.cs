@@ -13,7 +13,9 @@ public class CompanySettings
     public string? Address { get; set; }
     public string? Tagline { get; set; }       // mis. "Supplier dan Distributor Pallet Plastik" (kop surat penawaran)
     public string? Website { get; set; }
-    public string? City { get; set; }          // kota penerbitan surat, mis. "Bekasi"
+    public string? City { get; set; }
+    public string? SignatureUrl { get; set; }  // tanda tangan digital penanda tangan (PNG transparan)
+    public string? StampUrl { get; set; }      // stempel perusahaan          // kota penerbitan surat, mis. "Bekasi"
 
     public string? BankName { get; set; }
     public string? BankAccountNumber { get; set; }

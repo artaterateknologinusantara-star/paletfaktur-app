@@ -10,7 +10,10 @@ public enum SuratJalanStatus
 public class SuratJalan
 {
     public int Id { get; set; }
-    public string SuratJalanNumber { get; set; } = string.Empty; // SJ-001
+    public string SuratJalanNumber { get; set; } = string.Empty; // 030/SJ/MBSTA/2026 (data lama: SJ-001)
+    public int Sequence { get; set; }                            // nomor urut per tahun untuk penomoran otomatis
+    public string? PoNumber { get; set; }                        // Nomor P.O pelanggan
+    public string? RecipientDescription { get; set; }            // baris keterangan di bawah nama penerima
     public int? InvoiceId { get; set; }
     public Invoice? Invoice { get; set; }
     public int ClientId { get; set; }

@@ -36,6 +36,8 @@ export interface InvoiceItemResponse {
   productName: string;
   productSku: string;
   description: string | null;
+  condition: string | null;
+  color: string | null;
   quantity: number;
   unitPrice: number;
   lineTotal: number;
@@ -81,18 +83,30 @@ export interface SuratJalanListItemResponse {
   status: string;
 }
 
+export interface SuratJalanItemResponse {
+  itemDescription: string;
+  color: string | null;
+  quantity: number;
+  unit: string;
+  notes: string | null;
+}
+
 export interface SuratJalanResponse {
   id: number;
   suratJalanNumber: string;
+  invoiceId: number | null;
   invoiceNumber: string | null;
+  clientId: number;
   clientName: string;
+  recipientDescription: string | null;
+  poNumber: string | null;
   deliveryDate: string;
   deliveryAddress: string;
   driverName: string;
   vehicleNumber: string;
   notes: string | null;
   status: string;
-  items: { itemDescription: string; quantity: number; unit: string; notes: string | null }[];
+  items: SuratJalanItemResponse[];
 }
 
 export interface LogoUploadResponse {
@@ -115,6 +129,8 @@ export interface CompanySettingsResponse {
   bankAccountHolder: string | null;
   ppnRate: number;
   invoiceDueDays: number;
+  signatureUrl: string | null;
+  stampUrl: string | null;
 }
 
 export interface DashboardSummaryResponse {
@@ -168,6 +184,8 @@ export interface QuotationResponse {
   total: number;
   items: QuotationItemResponse[];
   photos: QuotationPhotoResponse[];
+  invoiceId: number | null;
+  invoiceNumber: string | null;
 }
 
 export interface QuotationPhotoResponse {

@@ -51,6 +51,10 @@ public class AppDbContext : DbContext
             .Property(i => i.Quantity).HasColumnType("decimal(18,2)");
 
         modelBuilder.Entity<Quotation>().HasIndex(q => q.QuotationNumber).IsUnique();
+        modelBuilder.Entity<Invoice>()
+            .HasOne(i => i.Quotation).WithMany().HasForeignKey(i => i.QuotationId).OnDelete(DeleteBehavior.Restrict);
+        // Satu penawaran hanya boleh punya satu invoice (menahan klik ganda / race).
+        modelBuilder.Entity<Invoice>().HasIndex(i => i.QuotationId).IsUnique().HasFilter("[QuotationId] IS NOT NULL");
         modelBuilder.Entity<Quotation>().Property(q => q.Total).HasColumnType("decimal(18,2)");
         modelBuilder.Entity<QuotationItem>().Property(i => i.UnitPrice).HasColumnType("decimal(18,2)");
         modelBuilder.Entity<QuotationItem>().Property(i => i.LineTotal).HasColumnType("decimal(18,2)");

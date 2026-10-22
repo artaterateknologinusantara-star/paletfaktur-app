@@ -10,6 +10,8 @@ public class InvoiceItem
     public string ProductNameSnapshot { get; set; } = string.Empty;
     public string ProductSkuSnapshot { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public string? Condition { get; set; }   // Baru / Second (dari penawaran)
+    public string? Color { get; set; }
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }

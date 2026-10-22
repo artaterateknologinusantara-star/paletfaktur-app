@@ -5,8 +5,9 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { apiRequest, assetUrl, formatRupiah } from "@/lib/api";
 import { CompanySettingsResponse, QuotationResponse } from "@/lib/types";
+import SignatureBlock from "@/components/SignatureBlock";
 
-const MIN_ROWS = 8;
+const MIN_ROWS = 5;
 const HEAD_BLUE = "#2f5597";
 
 function longDate(value: string) {
@@ -18,6 +19,7 @@ export default function PenawaranPreviewPage() {
   const [q, setQ] = useState<QuotationResponse | null>(null);
   const [s, setS] = useState<CompanySettingsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [signed, setSigned] = useState(true);
 
   useEffect(() => {
     apiRequest<QuotationResponse>(`/quotations/${params.id}`).then(setQ).catch((e) => setError(e.message));
@@ -36,7 +38,7 @@ export default function PenawaranPreviewPage() {
       <div className="w-24 h-24 shrink-0 flex items-center justify-center">
         {s.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={assetUrl(s.logoUrl)} alt="Logo" className="max-w-full max-h-full object-contain" />
+          <img src={assetUrl(s.logoUrl)} alt="Logo" className="max-w-full max-h-full object-contain mix-blend-multiply" />
         )}
       </div>
       <div className="flex-1 text-center">
@@ -48,7 +50,7 @@ export default function PenawaranPreviewPage() {
     </div>
   );
   const footer = (
-    <div className="border-t-[3px] border-black mt-8 pt-2 flex justify-between text-[9px] leading-snug">
+    <div className="border-t-[3px] border-black mt-4 pt-2 break-inside-avoid flex justify-between text-[9px] leading-snug">
       <div>
         <p className="font-bold">{s.companyName}</p>
         <p>Kantor Pusat:</p>
@@ -62,8 +64,10 @@ export default function PenawaranPreviewPage() {
       </div>
     </div>
   );
+  // Makin banyak foto, makin kecil tinggi maksimum tiap foto agar lampiran + footer muat satu halaman.
+  const photoMax = q.photos.length <= 2 ? "max-h-[120mm]" : q.photos.length <= 4 ? "max-h-[72mm]" : "max-h-[50mm]";
   const captions = q.photos.map((p) => p.caption?.trim()).filter(Boolean) as string[];
-  const page = "bg-white rounded-xl border border-slate-200 print:border-0 print:rounded-none px-12 py-8 print:px-4 print:py-0 max-w-[210mm] mx-auto text-[13px] text-black flex flex-col print:min-h-[275mm]";
+  const page = "bg-white rounded-xl border border-slate-200 print:border-0 print:rounded-none a4-sheet px-12 py-8 text-[13px] print:text-[12px] text-black flex flex-col print:min-h-[268mm]";
 
   return (
     <div>
@@ -72,7 +76,13 @@ export default function PenawaranPreviewPage() {
           <Link href="/penawaran" className="text-sm text-blue-600 hover:underline">← Kembali ke Daftar Penawaran</Link>
           <h1 className="text-2xl font-bold mt-1">Pratinjau Surat Penawaran</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3 items-center">
+          {(s.signatureUrl || s.stampUrl) && (
+            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+              <input type="checkbox" checked={signed} onChange={(e) => setSigned(e.target.checked)} />
+              Sertakan tanda tangan digital
+            </label>
+          )}
           <Link href={`/penawaran/${q.id}/edit`} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50">
             Edit
           </Link>
@@ -86,7 +96,7 @@ export default function PenawaranPreviewPage() {
         <div className="flex-1">
           {kop}
 
-          <h2 className="text-center font-bold underline text-base mt-3">SURAT PENAWARAN HARGA</h2>
+          <h2 className="text-center font-bold underline text-base mt-2">SURAT PENAWARAN HARGA</h2>
           <p className="text-right mt-1">
             {s.city ? `${s.city}, ` : ""}
             {longDate(q.quotationDate)}
@@ -100,9 +110,9 @@ export default function PenawaranPreviewPage() {
               <tr><td className="pr-6 py-0.5">Kepada</td><td>:</td></tr>
             </tbody>
           </table>
-          <p className="font-bold mt-3 ml-6 text-sm">{q.recipientName}</p>
+          <p className="font-bold mt-2 ml-6 text-sm">{q.recipientName}</p>
 
-          <div className="mt-6 space-y-1 text-justify">
+          <div className="mt-4 space-y-1 text-justify">
             <p>Dengan hormat,</p>
             {q.introText ? (
               <p className="whitespace-pre-line">{q.introText}</p>
@@ -114,7 +124,7 @@ export default function PenawaranPreviewPage() {
             )}
           </div>
 
-          <p className="mt-5 mb-1">Berikut daftar harga Pallet Plastik yang kami tawarkan:</p>
+          <p className="mt-3 mb-1">Berikut daftar harga Pallet Plastik yang kami tawarkan:</p>
           <table className="w-full border-collapse text-xs">
             <thead>
               <tr style={{ backgroundColor: HEAD_BLUE }} className="text-white">
@@ -136,7 +146,7 @@ export default function PenawaranPreviewPage() {
                 </tr>
               ))}
               {Array.from({ length: emptyRows }).map((_, i) => (
-                <tr key={`e${i}`} className="h-7">
+                <tr key={`e${i}`} className="h-6">
                   {Array.from({ length: 7 }).map((__, c) => (
                     <td key={c} className="border border-slate-400" />
                   ))}
@@ -146,13 +156,13 @@ export default function PenawaranPreviewPage() {
           </table>
 
           {q.notes && (
-            <div className="mt-4 flex gap-4">
+            <div className="mt-3 flex gap-4">
               <span className="underline italic">Catatan :</span>
               <p className="font-bold whitespace-pre-line">{q.notes}</p>
             </div>
           )}
 
-          <div className="mt-6 space-y-1 text-justify">
+          <div className="mt-4 space-y-1 text-justify">
             <p>
               Jika berminat dengan penawaran kami dan ada pertanyaan mengenai perihal surat penawaran ini kami persilakan untuk menghubungi ke
               nomor <b>{s.phone}</b>.
@@ -163,7 +173,7 @@ export default function PenawaranPreviewPage() {
             </p>
           </div>
 
-          <div className="mt-8 flex justify-between items-start">
+          <div className="mt-5 flex justify-between items-start">
             <div className="text-sm leading-relaxed">
               {s.bankAccountNumber && (
                 <>
@@ -177,7 +187,7 @@ export default function PenawaranPreviewPage() {
             <div className="text-sm text-left min-w-[200px]">
               <p>Salam hangat,</p>
               <p>{s.companyName}</p>
-              <div className="h-20" />
+              <SignatureBlock settings={s} show={signed} className="h-14" />
               <p className="font-bold border-t border-black pt-1 inline-block min-w-[200px]">{s.signatoryName}</p>
               {s.signatoryTitle && <p className="text-xs">{s.signatoryTitle}</p>}
             </div>
@@ -203,7 +213,7 @@ export default function PenawaranPreviewPage() {
               {q.photos.map((p, i) => (
                 <div key={i} className="break-inside-avoid flex items-center justify-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={assetUrl(p.url)} alt={p.caption ?? `Foto ${i + 1}`} className="max-w-full max-h-[110mm] object-contain" />
+                  <img src={assetUrl(p.url)} alt={p.caption ?? `Foto ${i + 1}`} className={`max-w-full ${photoMax} object-contain`} />
                 </div>
               ))}
             </div>

@@ -108,7 +108,10 @@ if (-not (Get-Service $ServiceName -ErrorAction SilentlyContinue)) {
     Run $Nssm @('set', $ServiceName, 'AppStderr', 'C:\ArunaData\logs\pallet-frontend.err.log')
     Run $Nssm @('set', $ServiceName, 'AppRotateFiles', '1')
 }
-& $Nssm start $ServiceName 2>&1 | Out-Null   # exit 1 + START_PENDING itu normal; status diverifikasi smoke test
+# nssm sering lapor START_PENDING (stderr, exit 1) padahal service naik; status diverifikasi smoke test.
+$prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+& $Nssm start $ServiceName 2>&1 | Out-Null
+$ErrorActionPreference = $prev
 
 Step 'Smoke test'
 Start-Sleep 8

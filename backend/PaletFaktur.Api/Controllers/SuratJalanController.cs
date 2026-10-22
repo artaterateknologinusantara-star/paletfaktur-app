@@ -49,15 +49,17 @@ public class SuratJalanController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("next-number")]
+    public ActionResult<object> NextNumber([FromQuery] int? year)
+    {
+        var (number, _) = _docNumbers.NextSuratJalanNumber(year ?? DateTime.Now.Year);
+        return Ok(new { number });
+    }
+
     [HttpGet("{id}")]
     public async Task<ActionResult<SuratJalanResponse>> GetById(int id)
     {
-        var sj = await _db.SuratJalans
-            .Include(s => s.Invoice)
-            .Include(s => s.Client)
-            .Include(s => s.Items)
-            .FirstOrDefaultAsync(s => s.Id == id);
-
+        var sj = await LoadAsync(id);
         if (sj is null) return NotFound();
         return Ok(ToResponse(sj));
     }
@@ -65,55 +67,71 @@ public class SuratJalanController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<SuratJalanResponse>> Create(SuratJalanCreateRequest request)
     {
+        var error = Validate(request);
+        if (error is not null) return BadRequest(new { message = error });
+
         var client = await _db.Clients.FindAsync(request.ClientId);
         if (client is null) return BadRequest(new { message = "Klien tidak ditemukan." });
 
-        Invoice? invoice = null;
-        if (request.InvoiceId.HasValue)
+        var sj = new SuratJalan { Status = SuratJalanStatus.Proses };
+        var year = request.DeliveryDate.Year;
+        if (!string.IsNullOrWhiteSpace(request.SuratJalanNumber))
         {
-            invoice = await _db.Invoices.FindAsync(request.InvoiceId.Value);
+            sj.SuratJalanNumber = request.SuratJalanNumber.Trim();
+            sj.Sequence = DocumentNumberService.ParseSequence(sj.SuratJalanNumber);
+        }
+        else
+        {
+            (sj.SuratJalanNumber, sj.Sequence) = _docNumbers.NextSuratJalanNumber(year);
+        }
+        if (await _db.SuratJalans.AnyAsync(x => x.SuratJalanNumber == sj.SuratJalanNumber))
+        {
+            return Conflict(new { message = "Nomor surat jalan sudah dipakai." });
         }
 
-        var sj = new SuratJalan
-        {
-            SuratJalanNumber = _docNumbers.NextSuratJalanNumber(),
-            InvoiceId = invoice?.Id,
-            ClientId = client.Id,
-            RecipientName = client.Name,
-            DeliveryDate = request.DeliveryDate,
-            DeliveryAddress = request.DeliveryAddress,
-            DriverName = request.DriverName,
-            VehicleNumber = request.VehicleNumber,
-            Notes = request.Notes,
-            Status = SuratJalanStatus.Proses
-        };
-
-        foreach (var item in request.Items)
-        {
-            sj.Items.Add(new SuratJalanItem
-            {
-                ItemDescription = item.ItemDescription,
-                Quantity = item.Quantity,
-                Unit = item.Unit,
-                Notes = item.Notes
-            });
-        }
-
+        await ApplyAsync(sj, request, client);
         _db.SuratJalans.Add(sj);
         await _db.SaveChangesAsync();
 
-        var created = await _db.SuratJalans
-            .Include(s => s.Invoice).Include(s => s.Client).Include(s => s.Items)
-            .FirstAsync(s => s.Id == sj.Id);
+        var created = await LoadAsync(sj.Id);
+        return CreatedAtAction(nameof(GetById), new { id = sj.Id }, ToResponse(created!));
+    }
 
-        return CreatedAtAction(nameof(GetById), new { id = sj.Id }, ToResponse(created));
+    [HttpPut("{id}")]
+    public async Task<ActionResult<SuratJalanResponse>> Update(int id, SuratJalanCreateRequest request)
+    {
+        var error = Validate(request);
+        if (error is not null) return BadRequest(new { message = error });
+
+        var sj = await LoadAsync(id);
+        if (sj is null) return NotFound();
+
+        var client = await _db.Clients.FindAsync(request.ClientId);
+        if (client is null) return BadRequest(new { message = "Klien tidak ditemukan." });
+
+        if (!string.IsNullOrWhiteSpace(request.SuratJalanNumber) && request.SuratJalanNumber.Trim() != sj.SuratJalanNumber)
+        {
+            var number = request.SuratJalanNumber.Trim();
+            if (await _db.SuratJalans.AnyAsync(x => x.SuratJalanNumber == number && x.Id != id))
+            {
+                return Conflict(new { message = "Nomor surat jalan sudah dipakai." });
+            }
+            sj.SuratJalanNumber = number;
+            sj.Sequence = DocumentNumberService.ParseSequence(number);
+        }
+
+        _db.SuratJalanItems.RemoveRange(sj.Items);
+        sj.Items.Clear();
+        await ApplyAsync(sj, request, client);
+        await _db.SaveChangesAsync();
+
+        return Ok(ToResponse((await LoadAsync(id))!));
     }
 
     [HttpPut("{id}/status")]
     public async Task<ActionResult<SuratJalanResponse>> UpdateStatus(int id, [FromBody] string status)
     {
-        var sj = await _db.SuratJalans.Include(s => s.Invoice).Include(s => s.Client).Include(s => s.Items)
-            .FirstOrDefaultAsync(s => s.Id == id);
+        var sj = await LoadAsync(id);
         if (sj is null) return NotFound();
 
         if (!Enum.TryParse<SuratJalanStatus>(status, true, out var parsedStatus))
@@ -136,16 +154,65 @@ public class SuratJalanController : ControllerBase
         return NoContent();
     }
 
+    private Task<SuratJalan?> LoadAsync(int id) =>
+        _db.SuratJalans.Include(s => s.Invoice).Include(s => s.Client).Include(s => s.Items)
+            .FirstOrDefaultAsync(s => s.Id == id);
+
+    private static string? Validate(SuratJalanCreateRequest r)
+    {
+        if (string.IsNullOrWhiteSpace(r.DeliveryAddress)) return "Alamat pengiriman wajib diisi.";
+        if (r.Items is null || r.Items.Count == 0) return "Minimal satu barang.";
+        if (r.Items.Any(i => string.IsNullOrWhiteSpace(i.ItemDescription))) return "Nama barang wajib diisi.";
+        if (r.Items.Any(i => i.Quantity <= 0)) return "Jumlah barang harus lebih dari 0.";
+        return null;
+    }
+
+    private async Task ApplyAsync(SuratJalan sj, SuratJalanCreateRequest r, Client client)
+    {
+        Invoice? invoice = null;
+        if (r.InvoiceId.HasValue)
+        {
+            invoice = await _db.Invoices.FindAsync(r.InvoiceId.Value);
+        }
+
+        sj.InvoiceId = invoice?.Id;
+        sj.ClientId = client.Id;
+        sj.RecipientName = client.Name;
+        sj.RecipientDescription = string.IsNullOrWhiteSpace(r.RecipientDescription) ? null : r.RecipientDescription.Trim();
+        sj.PoNumber = string.IsNullOrWhiteSpace(r.PoNumber) ? null : r.PoNumber.Trim();
+        sj.DeliveryDate = r.DeliveryDate;
+        sj.DeliveryAddress = r.DeliveryAddress.Trim();
+        sj.DriverName = r.DriverName?.Trim() ?? string.Empty;
+        sj.VehicleNumber = r.VehicleNumber?.Trim() ?? string.Empty;
+        sj.Notes = r.Notes;
+
+        foreach (var item in r.Items)
+        {
+            sj.Items.Add(new SuratJalanItem
+            {
+                ItemDescription = item.ItemDescription.Trim(),
+                Color = string.IsNullOrWhiteSpace(item.Color) ? null : item.Color.Trim(),
+                Quantity = item.Quantity,
+                Unit = string.IsNullOrWhiteSpace(item.Unit) ? "pcs" : item.Unit.Trim(),
+                Notes = item.Notes
+            });
+        }
+    }
+
     private static SuratJalanResponse ToResponse(SuratJalan sj) => new(
         sj.Id,
         sj.SuratJalanNumber,
+        sj.InvoiceId,
         sj.Invoice?.InvoiceNumber,
+        sj.ClientId,
         sj.Client?.Name ?? sj.RecipientName,
+        sj.RecipientDescription,
+        sj.PoNumber,
         sj.DeliveryDate,
         sj.DeliveryAddress,
         sj.DriverName,
         sj.VehicleNumber,
         sj.Notes,
         sj.Status.ToString(),
-        sj.Items.Select(i => new SuratJalanItemResponse(i.ItemDescription, i.Quantity, i.Unit, i.Notes)).ToList());
+        sj.Items.OrderBy(i => i.Id).Select(i => new SuratJalanItemResponse(i.ItemDescription, i.Color, i.Quantity, i.Unit, i.Notes)).ToList());
 }

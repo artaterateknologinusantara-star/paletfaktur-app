@@ -23,3 +23,25 @@ body {
     print-color-adjust: exact;
   }
 }
+
+/* Lembar cetak: di layar selebar kertas A4 (210mm); saat dicetak mengikuti area cetak halaman A4. */
+.a4-sheet {
+  width: 100%;
+  max-width: 210mm;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media print {
+  .a4-sheet {
+    max-width: none;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    break-inside: auto;
+  }
+}

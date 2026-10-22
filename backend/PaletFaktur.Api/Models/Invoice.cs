@@ -12,11 +12,14 @@ public enum InvoiceStatus
 public class Invoice
 {
     public int Id { get; set; }
-    public string InvoiceNumber { get; set; } = string.Empty; // INV-20260526-0011
+    public string InvoiceNumber { get; set; } = string.Empty; // 030/INV/MBSTA/2026 (data lama: INV-20260526-0011)
+    public int Sequence { get; set; }                         // nomor urut per tahun untuk penomoran otomatis
     public int ClientId { get; set; }
     public Client? Client { get; set; }
     public DateTime IssueDate { get; set; }
     public DateTime DueDate { get; set; }
+    public int? QuotationId { get; set; }          // invoice hanya dibuat dari penawaran berstatus Disetujui
+    public Quotation? Quotation { get; set; }
     public string? PoNumber { get; set; }
     public bool ApplyTax { get; set; } = true;
     public string? Notes { get; set; }

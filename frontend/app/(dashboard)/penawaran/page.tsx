@@ -89,6 +89,7 @@ export default function PenawaranPage() {
                 <td className="py-2 pl-6">
                   <select
                     value={q.status}
+                    disabled={q.invoiceId !== null}
                     onChange={(e) => handleStatus(q, e.target.value)}
                     className={`text-xs font-semibold rounded-full px-2 py-1 border-0 ${STATUS_STYLE[q.status]}`}
                   >
@@ -98,18 +99,35 @@ export default function PenawaranPage() {
                       </option>
                     ))}
                   </select>
+                  {q.invoiceId !== null && (
+                    <Link href={`/invoice/${q.invoiceId}`} className="block text-[11px] text-blue-600 hover:underline mt-1">
+                      Invoice: {q.invoiceNumber}
+                    </Link>
+                  )}
                 </td>
                 <td className="py-2">
                   <div className="flex gap-2">
+                    {q.status === "Disetujui" && q.invoiceId === null && (
+                      <Link
+                        href={`/invoice/create?quotationId=${q.id}`}
+                        className="text-xs rounded-lg bg-emerald-600 text-white px-2.5 py-1.5 font-medium hover:bg-emerald-700"
+                      >
+                        Buat Invoice
+                      </Link>
+                    )}
                     <Link href={`/penawaran/${q.id}`} className="text-xs rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">
                       Lihat / Cetak
                     </Link>
-                    <Link href={`/penawaran/${q.id}/edit`} className="text-xs rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">
-                      Edit
-                    </Link>
-                    <button onClick={() => handleDelete(q)} className="text-xs rounded-lg border border-red-200 text-red-600 px-2.5 py-1.5 hover:bg-red-50">
-                      Hapus
-                    </button>
+                    {q.invoiceId === null && (
+                      <>
+                        <Link href={`/penawaran/${q.id}/edit`} className="text-xs rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50">
+                          Edit
+                        </Link>
+                        <button onClick={() => handleDelete(q)} className="text-xs rounded-lg border border-red-200 text-red-600 px-2.5 py-1.5 hover:bg-red-50">
+                          Hapus
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
